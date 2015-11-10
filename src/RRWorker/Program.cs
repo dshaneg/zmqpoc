@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading;
-using ZeroMQ;
+using NetMQ;
 
 namespace RRWorker
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -19,7 +19,7 @@ namespace RRWorker
             if (args == null || args.Length < 2)
             {
                 Console.WriteLine();
-                Console.WriteLine("Usage: ./{0} RRWorker [Name] [Endpoint]", AppDomain.CurrentDomain.FriendlyName);
+                Console.WriteLine("Usage: ./{0} [Name] [Endpoint]", AppDomain.CurrentDomain.FriendlyName);
                 Console.WriteLine();
                 Console.WriteLine("    Name      Your Name");
                 Console.WriteLine("    Endpoint  Where RRWorker should connect to.");
@@ -27,38 +27,36 @@ namespace RRWorker
                 Console.WriteLine();
                 if (args == null || args.Length < 1)
                 {
-                    args = new[] { "World", "tcp://127.0.0.1:5560" };
+                    args = new[] {"World", "tcp://127.0.0.1:5560"};
                 }
                 else
                 {
-                    args = new[] { args[0], "tcp://127.0.0.1:5560" };
+                    args = new[] {args[0], "tcp://127.0.0.1:5560"};
                 }
             }
 
-            string name = args[0];
+            var name = args[0];
 
-            string endpoint = args[1];
+            var endpoint = args[1];
 
             // Socket to talk to clients
-            using (var context = new ZContext())
-            using (var responder = new ZSocket(context, ZSocketType.REP))
+            using (var context = NetMQContext.Create())
+            using (var responder = context.CreateResponseSocket())
             {
                 responder.Connect(endpoint);
 
                 while (true)
                 {
                     // Wait for next request from client
-                    using (ZFrame request = responder.ReceiveFrame())
-                    {
-                        Console.Write("{0} ", request.ReadString());
+                    var request = responder.ReceiveFrameString();
+                    Console.Write("{0} ", request);
 
-                        // Do some 'work'
-                        Thread.Sleep(100);
+                    // Do some 'work'
+                    Thread.Sleep(100);
 
-                        // Send reply back to client
-                        Console.WriteLine("{0}… ", name);
-                        responder.Send(new ZFrame(name));
-                    }
+                    // Send reply back to client
+                    Console.WriteLine("{0}… ", name);
+                    responder.SendFrame(name);
                 }
             }
         }

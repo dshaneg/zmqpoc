@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.NetworkInformation;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Remoting.Messaging;
-using System.Text;
-using System.Threading.Tasks;
-using ZeroMQ;
+using NetMQ;
 
 namespace UdpPingMarkI
 {
@@ -20,8 +13,9 @@ namespace UdpPingMarkI
 
         static void Main(string[] args)
         {
-            using (var context = new ZContext())
+            using (var context = NetMQContext.Create())
             using (var udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            using (var poller = new Poller())
             {
                 // Ask OS to let us do broadcasts from socket
                 udpSocket.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, 1);
@@ -34,7 +28,9 @@ namespace UdpPingMarkI
                 // once a second, and we collect and report beacons that come in
                 // from other nodes:
 
-                
+                poller.AddPollInSocket(udpSocket, socket => { });
+                poller.PollTillCancelledNonBlocking();
+                //poller.ad
                 //var poller = new z
                 //var pollItemsList = new List<ZPollItem>();
                 //pollItemsList.Add(new ZPollItem(ZPoll.In));

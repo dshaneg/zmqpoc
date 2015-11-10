@@ -1,9 +1,10 @@
 ﻿using System;
-using ZeroMQ;
+using System.Globalization;
+using NetMQ;
 
 namespace TaskVent
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -17,9 +18,9 @@ namespace TaskVent
 
             // Socket to send messages on and
             // Socket to send start of batch message on
-            using (var context = new ZContext())
-            using (var sender = new ZSocket(context, ZSocketType.PUSH))
-            using (var sink = new ZSocket(context, ZSocketType.PUSH))
+            using (var context = NetMQContext.Create())
+            using (var sender = context.CreatePushSocket())
+            using (var sink = context.CreatePushSocket())
             {
                 sender.Bind("tcp://*:5557");
                 sink.Connect("tcp://127.0.0.1:5558");
@@ -29,26 +30,24 @@ namespace TaskVent
                 Console.WriteLine("Sending tasks to workers…");
 
                 // The first message is "0" and signals start of batch
-                sink.Send(new byte[] { 0x00 }, 0, 1);
+                sink.SendFrame("0");
 
                 // Initialize random number generator
                 var rnd = new Random();
 
                 // Send 100 tasks
-                int i = 0;
-                long total_msec = 0;    // Total expected cost in msecs
-                for (; i < 100; ++i)
+                long totalMsec = 0;    // Total expected cost in msecs
+                for (var i = 0; i < 100; ++i)
                 {
                     // Random workload from 1 to 100msecs
-                    int workload = rnd.Next(100) + 1;
-                    total_msec += workload;
-                    byte[] action = BitConverter.GetBytes(workload);
+                    var workload = rnd.Next(100) + 1;
+                    totalMsec += workload;
 
                     Console.WriteLine("{0}", workload);
-                    sender.Send(action, 0, action.Length);
+                    sender.SendFrame(workload.ToString(CultureInfo.InvariantCulture));
                 }
 
-                Console.WriteLine("Total expected cost: {0} ms", total_msec);
+                Console.WriteLine("Total expected cost: {0} ms", totalMsec);
                 Console.ReadLine();
             }
         }

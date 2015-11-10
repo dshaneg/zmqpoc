@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using ZeroMQ;
+using NetMQ;
 
 namespace WUServer
 {
@@ -21,10 +16,11 @@ namespace WUServer
             //
 
             // Prepare our context and publisher
-            using (var context = new ZContext())
-            using (var publisher = new ZSocket(context, ZSocketType.PUB))
+            using (var context = NetMQContext.Create())
+            using (var publisher = context.CreatePublisherSocket())
             {
-                string address = "tcp://*:5556";
+                const string address = "tcp://*:5556";
+
                 Console.WriteLine("I: Publisher.Binding on {0}", address);
                 publisher.Bind(address);
 
@@ -34,15 +30,11 @@ namespace WUServer
                 while (true)
                 {
                     // Get values that will fool the boss
-                    int zipcode = rnd.Next(99999);
-                    int temperature = rnd.Next(-55, +45);
+                    var zipcode = rnd.Next(99999);
+                    var temperature = rnd.Next(-55, +45);
 
                     // Send message to all subscribers
-                    var update = string.Format("{0:D5} {1}", zipcode, temperature);
-                    using (var updateFrame = new ZFrame(update))
-                    {
-                        publisher.Send(updateFrame);
-                    }
+                    publisher.SendFrame(string.Format("{0:D5} {1}", zipcode, temperature));
                 }
             }
         }

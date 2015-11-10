@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Threading;
-using ZeroMQ;
+using NetMQ;
 
 namespace HWClient
 {
@@ -11,8 +10,8 @@ namespace HWClient
             // hello world client
 
             // create
-            using (var context = new ZContext())
-            using (var requester = new ZSocket(context, ZSocketType.REQ))
+            using (var context = NetMQContext.Create())
+            using (var requester = context.CreateRequestSocket())
             {
                 // bind
                 requester.Connect("tcp://127.0.0.1:5555");
@@ -23,13 +22,12 @@ namespace HWClient
                     Console.Write("Sending {0}...", name);
 
                     // send
-                    requester.Send(new ZFrame(name));
+                    requester.SendFrame(name);
 
                     // receive
-                    using (var reply = requester.ReceiveFrame())
-                    {
-                        Console.WriteLine("Received {0}", reply.ReadString());
-                    }
+                    var reply = requester.ReceiveFrameString();
+                    
+                    Console.WriteLine("Received {0}", reply);
 
                     name = _AcceptName();
                 }

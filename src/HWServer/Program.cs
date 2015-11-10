@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading;
-using ZeroMQ;
+using NetMQ;
 
 namespace HWServer
 {
@@ -17,15 +17,15 @@ namespace HWServer
                 Console.WriteLine();
                 Console.WriteLine("   Greeting   A salutation. Default: Hello");
                 Console.WriteLine();
-                args = new string[] { "Hello" };
+                args = new[] { "Hello" };
             }
 
-            string greeting = args[0];
+            var greeting = args[0];
 
             // create
 
-            using (var context = new ZContext())
-            using (var responder = new ZSocket(context, ZSocketType.REP))
+            using (var context = NetMQContext.Create())
+            using (var responder = context.CreateResponseSocket())
             {
                 // bind
                 responder.Bind("tcp://*:5555");
@@ -33,18 +33,15 @@ namespace HWServer
                 while (true)
                 {
                     // receive
-                    using (ZFrame request = responder.ReceiveFrame())
-                    {
-                        var name = request.ReadString();
+                    var name = responder.ReceiveFrameString();
 
-                        Console.WriteLine("Received {0}", name);
+                    Console.WriteLine("Received {0}", name);
 
-                        // do some work
-                        Thread.Sleep(1);
+                    // do some work
+                    Thread.Sleep(1);
 
-                        // send
-                        responder.Send(new ZFrame(string.Format("{0} {1}!", greeting, name)));
-                    }
+                    // send
+                    responder.SendFrame(string.Format("{0} {1}!", greeting, name));
                 }
             }
         }

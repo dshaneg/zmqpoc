@@ -1,9 +1,9 @@
 ﻿using System;
-using ZeroMQ;
+using NetMQ;
 
 namespace RRClient
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -16,19 +16,17 @@ namespace RRClient
             //
 
             // Socket to talk to server
-            using (var context = new ZContext())
-            using (var requester = new ZSocket(context, ZSocketType.REQ))
+            using (var context = NetMQContext.Create())
+            using (var requester = context.CreateRequestSocket())
             {
                 requester.Connect("tcp://127.0.0.1:5559");
 
-                for (int n = 0; n < 10000; ++n)
+                for (var n = 0; n < 10000; ++n)
                 {
-                    requester.Send(new ZFrame("Hello"));
+                    requester.SendFrame("Hello");
 
-                    using (ZFrame reply = requester.ReceiveFrame())
-                    {
-                        Console.WriteLine("Hello {0}!", reply.ReadString());
-                    }
+                    var reply = requester.ReceiveFrameString();
+                    Console.WriteLine("Hello {0}!", reply);
                 }
             }
 

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
-using ZeroMQ;
+using NetMQ;
 
 namespace TaskSink
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -17,27 +17,24 @@ namespace TaskSink
             //
 
             // Prepare our context and socket
-            using (var context = new ZContext())
-            using (var sink = new ZSocket(context, ZSocketType.PULL))
+            using (var context = NetMQContext.Create())
+            using (var sink = context.CreatePullSocket())
             {
                 sink.Bind("tcp://*:5558");
 
                 // Wait for start of batch
-                sink.ReceiveFrame();
+                sink.ReceiveFrameBytes();
 
                 // Start our clock now
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
 
                 // Process 100 confirmations
-                for (int i = 0; i < 100; ++i)
+                for (var i = 0; i < 100; ++i)
                 {
-                    sink.ReceiveFrame();
+                    sink.ReceiveFrameBytes();
 
-                    if ((i / 10) * 10 == i)
-                        Console.Write(":");
-                    else
-                        Console.Write(".");
+                    Console.Write((i/10)*10 == i ? ":" : ".");
                 }
 
                 // Calculate and report duration of batch

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading;
-using ZeroMQ;
+using NetMQ;
 
 namespace TaskWork
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -20,9 +20,9 @@ namespace TaskWork
 
             // Socket to receive messages on and
             // Socket to send messages to
-            using (var context = new ZContext())
-            using (var receiver = new ZSocket(context, ZSocketType.PULL))
-            using (var sink = new ZSocket(context, ZSocketType.PUSH))
+            using (var context = NetMQContext.Create())
+            using (var receiver = context.CreatePullSocket())
+            using (var sink = context.CreatePushSocket())
             {
                 receiver.Connect("tcp://127.0.0.1:5557");
                 sink.Connect("tcp://127.0.0.1:5558");
@@ -30,14 +30,13 @@ namespace TaskWork
                 // Process tasks forever
                 while (true)
                 {
-                    var replyBytes = new byte[4];
-                    receiver.ReceiveBytes(replyBytes, 0, replyBytes.Length);
-                    int workload = BitConverter.ToInt32(replyBytes, 0);
+                    var workMessage = receiver.ReceiveFrameString();
+                    var workload = int.Parse(workMessage);
                     Console.WriteLine("{0}.", workload);    // Show progress
 
                     Thread.Sleep(workload);    // Do the work
 
-                    sink.Send(new byte[0], 0, 0);    // Send results to sink
+                    sink.SendFrameEmpty();    // Send results to sink
                 }
             }
         }

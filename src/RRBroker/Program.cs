@@ -1,9 +1,8 @@
-﻿using System;
-using ZeroMQ;
+﻿using NetMQ;
 
 namespace RRBroker
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -14,49 +13,15 @@ namespace RRBroker
             //
 
             // Prepare our context and sockets
-            using (var ctx = new ZContext())
-            using (var frontend = new ZSocket(ctx, ZSocketType.ROUTER))
-            using (var backend = new ZSocket(ctx, ZSocketType.DEALER))
+            using (var ctx = NetMQContext.Create())
+            using (var frontend = ctx.CreateRouterSocket())
+            using (var backend = ctx.CreateDealerSocket())
             {
                 frontend.Bind("tcp://*:5559");
                 backend.Bind("tcp://*:5560");
 
-                // Initialize poll set
-                var poll = ZPollItem.CreateReceiver();
-
-                // Switch messages between sockets
-                ZError error;
-                ZMessage message;
-                while (true)
-                {
-                    if (frontend.PollIn(poll, out message, out error, TimeSpan.FromMilliseconds(64)))
-                    {
-                        // Process all parts of the message
-                        Console_WriteZMessage("frontend", 2, message);
-                        backend.Send(message);
-                    }
-                    else
-                    {
-                        if (error == ZError.ETERM)
-                            return;    // Interrupted
-                        if (error != ZError.EAGAIN)
-                            throw new ZException(error);
-                    }
-
-                    if (backend.PollIn(poll, out message, out error, TimeSpan.FromMilliseconds(64)))
-                    {
-                        // Process all parts of the message
-                        Console_WriteZMessage(" backend", 2, message);
-                        frontend.Send(message);
-                    }
-                    else
-                    {
-                        if (error == ZError.ETERM)
-                            return;    // Interrupted
-                        if (error != ZError.EAGAIN)
-                            throw new ZException(error);
-                    }
-                }
+                var proxy = new Proxy(frontend, backend);
+                proxy.Start();
             }
         }
     }
