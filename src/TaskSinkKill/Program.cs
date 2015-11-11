@@ -37,7 +37,7 @@ namespace TaskSinkKill
                 {
                     receiver.ReceiveFrameBytes();
 
-                    Console.Write((i/10)*10 == i ? ":" : ".");
+                    Console.Write(((i+1) % 10) == 0 ? ":" : ".");
                 }
 
                 stopwatch.Stop();
