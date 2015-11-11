@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
-using ZeroMQ;
+using NetMQ;
 
 namespace TaskSinkKill
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -17,29 +17,27 @@ namespace TaskSinkKill
 
             // Socket to receive messages on and
             // Socket for worker control
-            using (var context = new ZContext())
-            using (var receiver = new ZSocket(context, ZSocketType.PULL))
-            using (var controller = new ZSocket(context, ZSocketType.PUB))
+            using (var context = NetMQContext.Create())
+            using (var receiver = context.CreatePullSocket())
+            using (var controller = context.CreatePublisherSocket())
             {
                 receiver.Bind("tcp://*:5558");
                 controller.Bind("tcp://*:5559");
 
+
                 // Wait for start of batch
-                receiver.ReceiveFrame();
+                receiver.ReceiveFrameBytes();
 
                 // Start our clock now
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
 
                 // Process 100 confirmations
-                for (int i = 0; i < 100; ++i)
+                for (var i = 0; i < 100; ++i)
                 {
-                    receiver.ReceiveFrame();
+                    receiver.ReceiveFrameBytes();
 
-                    if ((i / 10) * 10 == i)
-                        Console.Write(":");
-                    else
-                        Console.Write(".");
+                    Console.Write((i/10)*10 == i ? ":" : ".");
                 }
 
                 stopwatch.Stop();
@@ -49,7 +47,7 @@ namespace TaskSinkKill
                 Console.ReadLine();
 
                 // Send kill signal to workers
-                controller.Send(new ZFrame("KILL"));
+                controller.SendFrame("KILL");
             }
         }
     }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using ZeroMQ;
+using NetMQ;
 
 namespace WUProxy
 {
@@ -17,17 +17,17 @@ namespace WUProxy
             // Author: metadings
             //
 
-            using (var context = new ZContext())
-            using (var frontend = new ZSocket(context, ZSocketType.XSUB))
-            using (var backend = new ZSocket(context, ZSocketType.XPUB))
+            using (var context = NetMQContext.Create())
+            using (var frontend = context.CreateXSubscriberSocket())
+            using (var backend = context.CreateXPublisherSocket())
             {
                 // Frontend is where the weather server sits
-                string localhost = "tcp://127.0.0.1:5556";
+                const string localhost = "tcp://127.0.0.1:5556";
                 Console.WriteLine("I: Connecting to {0}", localhost);
                 frontend.Connect(localhost);
 
                 // Backend is our public endpoint for subscribers
-                foreach (IPAddress address in WUProxy_GetPublicIPs())
+                foreach (var address in WUProxy_GetPublicIPs())
                 {
                     var tcpAddress = string.Format("tcp://{0}:8100", address);
                     Console.WriteLine("I: Binding on {0}", tcpAddress);
@@ -37,22 +37,20 @@ namespace WUProxy
                     Console.WriteLine("I: Binding on {0}", epgmAddress);
                     backend.Bind(epgmAddress);
                 }
-                using (var subscription = ZFrame.Create(1))
-                {
-                    subscription.Write(new byte[] { 0x1 }, 0, 1);
-                    backend.Send(subscription);
-                }
+
+                backend.SendFrame(new byte[] { 0x1 });
 
                 // Run the proxy until the user interrupts us
-                ZContext.Proxy(frontend, backend);
+                var proxy = new Proxy(frontend, backend);
+                proxy.Start();
             }
         }
 
         static IEnumerable<IPAddress> WUProxy_GetPublicIPs()
         {
             var list = new List<IPAddress>();
-            NetworkInterface[] ifaces = NetworkInterface.GetAllNetworkInterfaces();
-            foreach (NetworkInterface iface in ifaces)
+            var ifaces = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (var iface in ifaces)
             {
                 if (iface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
                     continue;
@@ -61,7 +59,7 @@ namespace WUProxy
 
                 var props = iface.GetIPProperties();
                 var addresses = props.UnicastAddresses;
-                foreach (UnicastIPAddressInformation address in addresses)
+                foreach (var address in addresses)
                 {
                     if (address.Address.AddressFamily == AddressFamily.InterNetwork)
                         list.Add(address.Address);

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading;
-using ZeroMQ;
+using NetMQ;
 
 namespace TaskWorkKillable
 {
-    static partial class Program
+    static class Program
     {
         public static void Main(string[] args)
         {
@@ -18,40 +18,39 @@ namespace TaskWorkKillable
             // Socket to receive messages on,
             // Socket to send messages to and
             // Socket for control input
-            using (var context = new ZContext())
-            using (var receiver = new ZSocket(context, ZSocketType.PULL))
-            using (var sender = new ZSocket(context, ZSocketType.PUSH))
-            using (var controller = new ZSocket(context, ZSocketType.SUB))
+            using (var context = NetMQContext.Create())
+            using (var receiver = context.CreatePullSocket())
+            using (var sender = context.CreatePushSocket())
+            using (var controller = context.CreateSubscriberSocket())
             {
                 receiver.Connect("tcp://127.0.0.1:5557");
                 sender.Connect("tcp://127.0.0.1:5558");
-
                 controller.Connect("tcp://127.0.0.1:5559");
-                controller.SubscribeAll();
 
-                var poll = ZPollItem.CreateReceiver();
+                controller.SubscribeToAnyTopic();
 
-                ZError error;
-                ZMessage message;
-                while (true)
+                var poller = new Poller();
+                poller.AddSocket(receiver);
+                poller.AddSocket(controller);
+
+                receiver.ReceiveReady += (o, eventArgs) =>
                 {
-                    // Process messages from either socket
-                    if (receiver.PollIn(poll, out message, out error, TimeSpan.FromMilliseconds(64)))
-                    {
-                        int workload = message[0].ReadInt32();
-                        Console.WriteLine("{0}.", workload);    // Show progress
+                    var workload = int.Parse(eventArgs.Socket.ReceiveFrameString());
+                    
+                    Console.WriteLine("{0}.", workload); // Show progress
 
-                        Thread.Sleep(workload);    // Do the work
+                    Thread.Sleep(workload); // Do the work
 
-                        sender.Send(new byte[0], 0, 0);    // Send results to sink
-                    }
+                    sender.SendFrame(new byte[0]); // Send results to sink                
+                };
 
-                    // Any waiting controller command acts as 'KILL'
-                    if (controller.PollIn(poll, out message, out error, TimeSpan.FromMilliseconds(64)))
-                    {
-                        break;    // Exit loop
-                    }
-                }
+                controller.ReceiveReady += (o, eventArgs) =>
+                {
+                    if (eventArgs.Socket.ReceiveFrameString() == "KILL");
+                        poller.Cancel();
+                };
+
+                poller.PollTillCancelled();
             }
         }
     }
